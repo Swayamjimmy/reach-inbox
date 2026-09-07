@@ -3,6 +3,8 @@ import { Redis } from "ioredis";
 import { config } from "./config.js";
 import { initializeDatabase, pool } from "./db.js";
 import { sendEmail } from "./mailer.js";
+import { closeRateLimiter, reserveSend } from "./rate-limit.js";
+import { sendRateLimitAlert } from "./slack.js";
 
 type EmailRow = {
   id: string;
@@ -101,6 +103,35 @@ const worker = new Worker(
     }
 
     const email = claim.email;
+    const reservation = await reserveSend(email.sender_id);
+    if (!reservation.allowed) {
+      const retryAt = new Date(Date.now() + reservation.waitMs);
+      await pool.query(
+        `UPDATE emails
+         SET status = 'rate_limited',
+             rate_limited_until = $2,
+             processing_started_at = NULL,
+             updated_at = now()
+         WHERE id = $1`,
+        [email.id, retryAt],
+      );
+
+      if (reservation.hourlyLimitHit && reservation.shouldNotify) {
+        try {
+          await sendRateLimitAlert({
+            tenantId: email.tenant_id,
+            senderEmail: email.sender_email,
+            maximum: config.maxEmailsPerHourPerSender,
+          });
+        } catch (error) {
+          console.error("Slack alert failed without failing the email job", error);
+        }
+      }
+
+      await job.moveToDelayed(retryAt.getTime(), token);
+      throw new DelayedError();
+    }
+
     await pool.query(
       `UPDATE emails SET status = 'sending', updated_at = now() WHERE id = $1`,
       [email.id],
@@ -152,6 +183,7 @@ worker.on("error", (error) => {
 
 async function shutdown(): Promise<void> {
   await worker.close();
+  await closeRateLimiter();
   await pool.end();
   await workerRedis.quit();
 }
