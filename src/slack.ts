@@ -35,7 +35,7 @@ export async function createSlackAuthorizeUrl(
 
   const url = new URL("https://slack.com/oauth/v2/authorize");
   url.searchParams.set("client_id", slack.clientId);
-  url.searchParams.set("scope", "chat:write");
+  url.searchParams.set("scope", "chat:write,channels:read,groups:read");
   url.searchParams.set("redirect_uri", slack.redirectUri);
   url.searchParams.set("state", state);
   return url.toString();
@@ -97,17 +97,98 @@ export async function completeSlackOAuth(
   return { tenantId, teamName: data.team.name };
 }
 
+
+type SlackChannel = {
+  id: string;
+  name: string;
+  is_private: boolean;
+  is_member: boolean;
+  is_archived: boolean;
+};
+
+type ConversationsListResponse = {
+  ok: boolean;
+  error?: string;
+  response_metadata?: { next_cursor?: string };
+  channels?: SlackChannel[];
+};
+
+export async function getSlackChannels(tenantId: string): Promise<Array<{
+  id: string;
+  name: string;
+  isPrivate: boolean;
+}>> {
+  const result = await pool.query<{ access_token: string }>(
+    `SELECT access_token FROM slack_installations WHERE tenant_id = $1`,
+    [tenantId],
+  );
+  const token = result.rows[0]?.access_token;
+  if (!token) throw new Error("Connect Slack before loading channels");
+
+  const channels: SlackChannel[] = [];
+  let cursor = "";
+
+  do {
+    const url = new URL("https://slack.com/api/conversations.list");
+    url.searchParams.set("limit", "200");
+    url.searchParams.set("exclude_archived", "true");
+    url.searchParams.set("types", "public_channel,private_channel");
+    if (cursor) url.searchParams.set("cursor", cursor);
+
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = (await response.json()) as ConversationsListResponse;
+    if (!data.ok) throw new Error(data.error ?? "Unable to load Slack channels");
+
+    channels.push(...(data.channels ?? []));
+    cursor = data.response_metadata?.next_cursor ?? "";
+  } while (cursor);
+
+  return channels
+    .filter((channel) => !channel.is_archived && channel.is_member)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((channel) => ({
+      id: channel.id,
+      name: channel.name,
+      isPrivate: channel.is_private,
+    }));
+}
+
 export async function setSlackChannel(
   tenantId: string,
   channelId: string,
 ): Promise<void> {
-  const result = await pool.query(
+  const result = await pool.query<{ access_token: string }>(
+    `SELECT access_token FROM slack_installations WHERE tenant_id = $1`,
+    [tenantId],
+  );
+  const token = result.rows[0]?.access_token;
+  if (!token) throw new Error("Connect Slack before selecting a channel");
+
+  const url = new URL("https://slack.com/api/conversations.info");
+  url.searchParams.set("channel", channelId);
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = (await response.json()) as {
+    ok: boolean;
+    error?: string;
+    channel?: { is_member?: boolean; is_archived?: boolean };
+  };
+
+  if (!data.ok || !data.channel) {
+    throw new Error(data.error ?? "Slack channel could not be accessed");
+  }
+  if (data.channel.is_archived) throw new Error("Archived Slack channels cannot be selected");
+  if (!data.channel.is_member) {
+    throw new Error("The ReachInbox Slack app is not a member of this channel");
+  }
+
+  await pool.query(
     `UPDATE slack_installations SET channel_id = $2 WHERE tenant_id = $1`,
     [tenantId, channelId],
   );
-  if (result.rowCount !== 1) {
-    throw new Error("Connect Slack before selecting a channel");
-  }
 }
 
 export async function getSlackStatus(tenantId: string): Promise<object> {

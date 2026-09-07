@@ -1,0 +1,2 @@
+# Netscape HTTP Cookie File
+localhost	FALSE	/	TRUE	0	reachinbox_session	9e6768d5-d764-4ea1-a3ad-96494d792d10

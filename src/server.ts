@@ -2,12 +2,20 @@ import { randomUUID } from "node:crypto";
 import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { ExpressAdapter } from "@bull-board/express";
+import cookieParser from "cookie-parser";
 import express, {
   type NextFunction,
   type Request,
   type Response,
 } from "express";
 import { config } from "./config.js";
+import {
+  completeGoogleLogin,
+  createGoogleAuthorizeUrl,
+  loadUser,
+  logout,
+  requireUser,
+} from "./auth.js";
 import { initializeDatabase, pool } from "./db.js";
 import {
   emailQueue,
@@ -20,6 +28,7 @@ import {
   createSlackAuthorizeUrl,
   disconnectSlack,
   getSlackStatus,
+  getSlackChannels,
   setSlackChannel,
 } from "./slack.js";
 
@@ -28,8 +37,11 @@ const recovered = await recoverNonFinalEmails();
 
 const app = express();
 app.use(express.json({ limit: "100kb" }));
+app.use(cookieParser());
+app.use(loadUser);
 app.use((req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", config.frontendOrigin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
@@ -43,11 +55,10 @@ app.use((req, res, next) => {
 });
 
 function tenantId(req: Request): string {
-  const value = req.header("X-Tenant-Id") ?? "demo";
-  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(value)) {
-    throw new Error("Invalid X-Tenant-Id header");
+  if (!req.user) {
+    throw new Error("Authentication required");
   }
-  return value;
+  return req.user.tenantId;
 }
 
 function requiredString(value: unknown, field: string): string {
@@ -57,13 +68,60 @@ function requiredString(value: unknown, field: string): string {
   return value.trim();
 }
 
+app.get("/api/auth/google", (req, res) => {
+  res.redirect(createGoogleAuthorizeUrl(res));
+});
+
+app.get("/api/auth/google/callback", async (req, res) => {
+  try {
+    const code = requiredString(req.query.code, "code");
+    const state = requiredString(req.query.state, "state");
+    await completeGoogleLogin(
+      code,
+      state,
+      req.cookies?.reachinbox_oauth_state,
+      res,
+    );
+    res.redirect(`${config.frontendOrigin}/settings/slack`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Google login failed";
+    res.redirect(
+      `${config.frontendOrigin}/login?error=${encodeURIComponent(message)}`,
+    );
+  }
+});
+
+app.get("/api/auth/me", (req, res) => {
+  if (!req.user) {
+    res.status(401).json({ authenticated: false });
+    return;
+  }
+
+  res.json({
+    authenticated: true,
+    user: req.user,
+  });
+});
+
+app.post("/api/auth/logout", async (req, res) => {
+  await logout(req, res);
+});
+
 app.get("/api/health", async (_req, res) => {
   await pool.query("SELECT 1");
   await producerRedis.ping();
   res.json({ ok: true, recovered });
 });
 
-app.post("/api/senders", async (req, res) => {
+app.get("/api/senders", requireUser, async (req, res) => {
+  const result = await pool.query(
+    `SELECT * FROM senders WHERE tenant_id = $1 ORDER BY created_at ASC`,
+    [tenantId(req)],
+  );
+  res.json(result.rows);
+});
+
+app.post("/api/senders", requireUser, async (req, res) => {
   const tenant = tenantId(req);
   const id = requiredString(req.body.id, "id");
   const name = requiredString(req.body.name, "name");
@@ -80,7 +138,7 @@ app.post("/api/senders", async (req, res) => {
   res.status(201).json(result.rows[0]);
 });
 
-app.post("/api/emails", async (req, res) => {
+app.post("/api/emails", requireUser, async (req, res) => {
   const tenant = tenantId(req);
   const idempotencyKey = req.header("Idempotency-Key");
   if (!idempotencyKey) throw new Error("Idempotency-Key header is required");
@@ -150,7 +208,7 @@ app.post("/api/emails", async (req, res) => {
   res.status(202).json(saved.rows[0]);
 });
 
-app.get("/api/emails", async (req, res) => {
+app.get("/api/emails", requireUser, async (req, res) => {
   const tenant = tenantId(req);
   const status = typeof req.query.status === "string" ? req.query.status : null;
   const values: unknown[] = [tenant];
@@ -164,7 +222,7 @@ app.get("/api/emails", async (req, res) => {
   res.json(result.rows);
 });
 
-app.get("/api/slack/connect", async (req, res) => {
+app.get("/api/slack/connect", requireUser, async (req, res) => {
   const url = await createSlackAuthorizeUrl(tenantId(req));
   res.redirect(url);
 });
@@ -178,17 +236,21 @@ app.get("/api/slack/callback", async (req, res) => {
   );
 });
 
-app.get("/api/slack/status", async (req, res) => {
+app.get("/api/slack/status", requireUser, async (req, res) => {
   res.json(await getSlackStatus(tenantId(req)));
 });
 
-app.put("/api/slack/channel", async (req, res) => {
+app.get("/api/slack/channels", requireUser, async (req, res) => {
+  res.json(await getSlackChannels(tenantId(req)));
+});
+
+app.put("/api/slack/channel", requireUser, async (req, res) => {
   const channelId = requiredString(req.body.channelId, "channelId");
   await setSlackChannel(tenantId(req), channelId);
   res.json({ ok: true, channelId });
 });
 
-app.delete("/api/slack/disconnect", async (req, res) => {
+app.delete("/api/slack/disconnect", requireUser, async (req, res) => {
   await disconnectSlack(tenantId(req));
   res.status(204).end();
 });

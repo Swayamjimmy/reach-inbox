@@ -14,13 +14,16 @@
     "@bull-board/api": "9.8.0",
     "@bull-board/express": "9.8.0",
     "bullmq": "6.3.4",
+    "cookie-parser": "^1.4.7",
     "dotenv": "17.4.2",
     "express": "5.2.1",
+    "google-auth-library": "^11.0.2",
     "ioredis": "6.0.0",
     "nodemailer": "10.0.1",
     "pg": "8.23.0"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/express": "5.0.6",
     "@types/node": "^26.5.0",
     "@types/pg": "8.23.1",
