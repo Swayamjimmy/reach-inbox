@@ -1,0 +1,30 @@
+{
+  "name": "reachinbox-email-scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev:api": "tsx watch src/server.ts",
+    "dev:worker": "tsx watch src/worker.ts",
+    "start:api": "node dist/server.js",
+    "start:worker": "node dist/worker.js"
+  },
+  "dependencies": {
+    "@bull-board/api": "9.8.0",
+    "@bull-board/express": "9.8.0",
+    "bullmq": "6.3.4",
+    "dotenv": "17.4.2",
+    "express": "5.2.1",
+    "ioredis": "6.0.0",
+    "nodemailer": "10.0.1",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/node": "^26.5.0",
+    "@types/pg": "8.23.1",
+    "tsx": "4.23.13",
+    "typescript": "7.0.2"
+  }
+}
