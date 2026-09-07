@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { createBullBoard } from "@bull-board/api";
+import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
+import { ExpressAdapter } from "@bull-board/express";
 import express, {
   type NextFunction,
   type Request,
@@ -6,8 +9,15 @@ import express, {
 } from "express";
 import { config } from "./config.js";
 import { initializeDatabase, pool } from "./db.js";
+import {
+  emailQueue,
+  enqueueEmail,
+  producerRedis,
+  recoverNonFinalEmails,
+} from "./queue.js";
 
 await initializeDatabase();
+const recovered = await recoverNonFinalEmails();
 
 const app = express();
 app.use(express.json({ limit: "100kb" }));
@@ -42,7 +52,8 @@ function requiredString(value: unknown, field: string): string {
 
 app.get("/api/health", async (_req, res) => {
   await pool.query("SELECT 1");
-  res.json({ ok: true });
+  await producerRedis.ping();
+  res.json({ ok: true, recovered });
 });
 
 app.post("/api/senders", async (req, res) => {
@@ -111,6 +122,23 @@ app.post("/api/emails", async (req, res) => {
   );
   const email = result.rows[0]!;
 
+  try {
+    await enqueueEmail(email.id, new Date(email.scheduled_at));
+    await pool.query(
+      `UPDATE emails
+       SET status = CASE WHEN status = 'scheduled' THEN 'queued' ELSE status END,
+           updated_at = now()
+       WHERE id = $1`,
+      [email.id],
+    );
+  } catch (error) {
+    res.status(503).json({
+      error: "Email was saved but Redis enqueue failed; startup recovery will retry",
+      emailId: email.id,
+    });
+    return;
+  }
+
   const saved = await pool.query(`SELECT * FROM emails WHERE id = $1`, [email.id]);
   res.status(202).json(saved.rows[0]);
 });
@@ -129,6 +157,25 @@ app.get("/api/emails", async (req, res) => {
   res.json(result.rows);
 });
 
+const boardAdapter = new ExpressAdapter();
+boardAdapter.setBasePath("/admin/queues");
+createBullBoard({
+  queues: [new BullMQAdapter(emailQueue)],
+  serverAdapter: boardAdapter,
+});
+
+function protectBoard(req: Request, res: Response, next: NextFunction): void {
+  const expected = `Basic ${Buffer.from(`admin:${config.adminKey}`).toString("base64")}`;
+  if (req.header("Authorization") !== expected) {
+    res.setHeader("WWW-Authenticate", 'Basic realm="queues"');
+    res.status(401).send("Authentication required");
+    return;
+  }
+  next();
+}
+
+app.use("/admin/queues", protectBoard, boardAdapter.getRouter());
+
 app.use(
   (error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -138,4 +185,15 @@ app.use(
 
 const server = app.listen(config.port, () => {
   console.log(`API listening on http://localhost:${config.port}`);
+  console.log(`Recovered ${recovered} non-final email records`);
 });
+
+async function shutdown(): Promise<void> {
+  server.close();
+  await emailQueue.close();
+  await producerRedis.quit();
+  await pool.end();
+}
+
+process.on("SIGINT", () => void shutdown().then(() => process.exit(0)));
+process.on("SIGTERM", () => void shutdown().then(() => process.exit(0)));
