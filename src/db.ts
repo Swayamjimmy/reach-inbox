@@ -21,7 +21,8 @@ export async function initializeDatabase(): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       UNIQUE (tenant_id, email)
     );
-        CREATE TABLE IF NOT EXISTS emails (
+
+    CREATE TABLE IF NOT EXISTS emails (
       id TEXT PRIMARY KEY,
       tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
       sender_id TEXT NOT NULL REFERENCES senders(id),
@@ -46,7 +47,8 @@ export async function initializeDatabase(): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       UNIQUE (tenant_id, idempotency_key)
     );
-        CREATE INDEX IF NOT EXISTS emails_tenant_status_idx
+
+    CREATE INDEX IF NOT EXISTS emails_tenant_status_idx
       ON emails (tenant_id, status, scheduled_at);
 
     CREATE TABLE IF NOT EXISTS slack_installations (
