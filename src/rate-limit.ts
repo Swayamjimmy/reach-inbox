@@ -1,164 +1,71 @@
-import { DelayedError, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import { config } from "./config.js";
-import { initializeDatabase, pool } from "./db.js";
-import { sendEmail } from "./mailer.js";
 
-type EmailRow = {
-  id: string;
-  tenant_id: string;
-  sender_id: string;
-  sender_name: string;
-  sender_email: string;
-  to_email: string;
-  subject: string;
-  text_body: string;
-  status: string;
-  processing_started_at: Date | null;
-};
-
-type Claim =
-  | { kind: "work"; email: EmailRow }
-  | { kind: "delay"; waitMs: number }
-  | { kind: "skip" };
-
-async function claimEmail(emailId: string): Promise<Claim> {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await client.query<EmailRow>(
-      `SELECT e.*, s.name AS sender_name, s.email AS sender_email
-       FROM emails e
-       JOIN senders s ON s.id = e.sender_id
-       WHERE e.id = $1
-       FOR UPDATE OF e`,
-      [emailId],
-    );
-    const email = result.rows[0];
-    if (!email || ["sent", "failed", "uncertain"].includes(email.status)) {
-      await client.query("COMMIT");
-      return { kind: "skip" };
-    }
-
-    if (["processing", "sending"].includes(email.status)) {
-      const started = email.processing_started_at?.getTime() ?? 0;
-      const age = Date.now() - started;
-      if (age < config.sendLeaseMs) {
-        await client.query("COMMIT");
-        return { kind: "delay", waitMs: config.sendLeaseMs - age };
-      }
-      if (email.status === "sending") {
-        await client.query(
-          `UPDATE emails
-           SET status = 'uncertain',
-               last_error = 'SMTP outcome unknown after worker interruption',
-               updated_at = now()
-           WHERE id = $1`,
-          [emailId],
-        );
-        await client.query("COMMIT");
-        return { kind: "skip" };
-      }
-    }
-
-    const claimed = await client.query<EmailRow>(
-      `UPDATE emails
-       SET status = 'processing',
-           processing_started_at = now(),
-           attempts = attempts + 1,
-           updated_at = now()
-       WHERE id = $1
-       RETURNING *,
-         $2::text AS sender_name,
-         $3::text AS sender_email`,
-      [emailId, email.sender_name, email.sender_email],
-    );
-    await client.query("COMMIT");
-    return { kind: "work", email: claimed.rows[0]! };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-await initializeDatabase();
-const workerRedis = new Redis(config.redisUrl, {
+const redis = new Redis(config.redisUrl, {
   maxRetriesPerRequest: null,
 });
 
-const worker = new Worker(
-  "email-send",
-  async (job, token) => {
-    const emailId = String(job.data.emailId);
-    const claim = await claimEmail(emailId);
+const reserveScript = `
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+local maximum = tonumber(ARGV[1])
+local window_ms = tonumber(ARGV[2])
+local spacing_ms = tonumber(ARGV[3])
 
-    if (claim.kind === "skip") return { skipped: true };
-    if (claim.kind === "delay") {
-      await job.moveToDelayed(Date.now() + claim.waitMs, token);
-      throw new DelayedError();
-    }
+if current >= maximum then
+  local notify = redis.call('SET', KEYS[3], '1', 'NX', 'PX', window_ms)
+  return {0, window_ms, 1, notify and 1 or 0, current}
+end
 
-    const email = claim.email;
-    await pool.query(
-      `UPDATE emails SET status = 'sending', updated_at = now() WHERE id = $1`,
-      [email.id],
-    );
+local spacing = redis.call('SET', KEYS[2], '1', 'NX', 'PX', spacing_ms)
+if not spacing then
+  local wait_ms = redis.call('PTTL', KEYS[2])
+  return {0, wait_ms, 0, 0, current}
+end
 
-    try {
-      const sent = await sendEmail({
-        senderName: email.sender_name,
-        senderEmail: email.sender_email,
-        toEmail: email.to_email,
-        subject: email.subject,
-        textBody: email.text_body,
-      });
-      await pool.query(
-        `UPDATE emails
-         SET status = 'sent', provider_message_id = $2, preview_url = $3,
-             sent_at = now(), last_error = NULL, updated_at = now()
-         WHERE id = $1`,
-        [email.id, sent.messageId, sent.previewUrl],
-      );
-      return sent;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      await pool.query(
-        `UPDATE emails
-         SET status = 'uncertain', last_error = $2, updated_at = now()
-         WHERE id = $1`,
-        [email.id, message],
-      );
-      return { uncertain: true, reason: message };
-    }
-  },
-  {
-    connection: workerRedis,
-    concurrency: config.workerConcurrency,
-    maxStartedAttempts: 1000,
-  },
-);
+current = redis.call('INCR', KEYS[1])
+if current == 1 then
+  redis.call('PEXPIRE', KEYS[1], window_ms)
+end
 
-worker.on("completed", (job) => {
-  console.log(`Completed job ${job.id}`);
-});
-worker.on("failed", (job, error) => {
-  console.error(`Failed job ${job?.id ?? "unknown"}`, error);
-});
-worker.on("error", (error) => {
-  console.error("Worker error", error);
-});
+return {1, 0, 0, 0, current}
+`;
 
-async function shutdown(): Promise<void> {
-  await worker.close();
-  await pool.end();
-  await workerRedis.quit();
+export type Reservation = {
+  allowed: boolean;
+  waitMs: number;
+  hourlyLimitHit: boolean;
+  shouldNotify: boolean;
+  count: number;
+};
+
+export async function reserveSend(senderId: string): Promise<Reservation> {
+  const now = Date.now();
+  const hourStart = Math.floor(now / 3_600_000) * 3_600_000;
+  const windowMs = hourStart + 3_600_000 - now;
+  const keys = [
+    `email-rate-hour-${senderId}-${hourStart}`,
+    `email-spacing-${senderId}`,
+    `email-rate-notified-${senderId}-${hourStart}`,
+  ];
+
+  const raw = (await redis.eval(
+    reserveScript,
+    3,
+    ...keys,
+    config.maxEmailsPerHourPerSender,
+    windowMs,
+    config.minSendDelayMs,
+  )) as Array<number | string>;
+
+  return {
+    allowed: Number(raw[0]) === 1,
+    waitMs: Math.max(250, Number(raw[1])),
+    hourlyLimitHit: Number(raw[2]) === 1,
+    shouldNotify: Number(raw[3]) === 1,
+    count: Number(raw[4]),
+  };
 }
 
-process.on("SIGINT", () => void shutdown().then(() => process.exit(0)));
-process.on("SIGTERM", () => void shutdown().then(() => process.exit(0)));
-
-console.log(
-  `Email worker started with concurrency ${config.workerConcurrency}`,
-);
+export async function closeRateLimiter(): Promise<void> {
+  await redis.quit();
+}
