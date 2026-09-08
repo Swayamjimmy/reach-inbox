@@ -88,7 +88,8 @@ export default function Mailbox({
           </p>
         </div>
 
-        <div className={`mail-search ${query ? "has-value" : ""}`}>
+        {/* Updated classname here to match the fixed CSS */}
+        <div className={`mailbox-search ${query ? "has-value" : ""}`}>
           <Search size={16} />
           <input
             value={query}

@@ -95,32 +95,120 @@ button:disabled { cursor: default; }
 .profile-email { font-size: 11px; color: #8b918d; margin: 4px 0 12px; }
 .profile-menu button { border-top: 1px solid #eee; width: 100%; padding: 10px 2px 2px; display: flex; gap: 8px; align-items: center; font-size: 12px; color: #555; text-align: left; }
 
-/* Mailbox */
+/* Mailbox Toolbar & Header */
 .mailbox { max-width: 1100px; margin: 40px auto 0; }
-.mailbox-toolbar { height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.mailbox-toolbar h2 { font-size: 18px; font-weight: 600; margin: 0; }
-.icon-button { width: 34px; height: 34px; display: grid; place-items: center; color: #727b75; }
-.message-list { border-top: 1px solid #f0f2f1; margin-top: 13px; }
-.message-row {
-  width: 100%; min-height: 58px; border-bottom: 1px solid #edf0ee; display: flex; align-items: center;
-  gap: 10px; text-align: left; padding: 0 12px; position: relative;
+.mailbox-toolbar { 
+  display: flex; 
+  align-items: flex-start; 
+  justify-content: space-between; 
+  gap: 16px; 
+  margin-bottom: 20px;
 }
-.message-row:hover { background: #fbfcfb; }
-.row-to { width: 185px; flex: 0 0 185px; font-size: 13px; color: #222a24; }
-.row-main { min-width: 0; flex: 1; display: flex; align-items: center; gap: 8px; overflow: hidden; font-size: 13px; }
-.row-main strong { white-space: nowrap; font-weight: 500; }
-.row-preview { white-space: nowrap; color: #a0a7a2; overflow: hidden; text-overflow: ellipsis; }
-
-/* New Status Badges */
-.status-pill {
-  flex: 0 0 auto;
-  border-radius: 6px;
+.mailbox-title-row { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+}
+.mailbox-title-row h2 { 
+  font-size: 22px; 
+  font-weight: 600; 
+  margin: 0; 
+  color: #1a1d1b;
+}
+.mailbox-count {
+  background: #f0f4f2;
+  color: #4a534e;
   padding: 4px 10px;
-  font-size: 11px;
-  font-weight: 500;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
   display: flex;
   align-items: center;
-  gap: 5px;
+}
+.mailbox-subtitle {
+  margin: 6px 0 0 0;
+  font-size: 13px;
+  color: #7b847e;
+}
+
+/* Mailbox Search */
+.mailbox-search {
+  flex: 0 0 320px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid #e2e7e4;
+  border-radius: 9px;
+  background: #fafcfb;
+  color: #8a938d;
+  transition: all 0.2s ease;
+}
+.mailbox-search:focus-within {
+  background: #fff;
+  border-color: #00ab44;
+  box-shadow: 0 0 0 3px rgba(0, 171, 68, 0.1);
+}
+.mailbox-search svg { flex: 0 0 auto; color: #9aa19d; }
+.mailbox-search input { 
+  width: 100%; 
+  min-width: 0; 
+  border: 0; 
+  outline: none; 
+  background: transparent; 
+  color: #303832; 
+  font-size: 13px; 
+}
+.mailbox-search input::placeholder { color: #a2aaa5; }
+
+/* Message List & Rows */
+.message-list { border-top: 1px solid #edf0ee; }
+.message-row {
+  width: 100%; 
+  min-height: 64px; 
+  border-bottom: 1px solid #edf0ee; 
+  display: flex; 
+  align-items: center;
+  gap: 16px; 
+  text-align: left; 
+  padding: 12px; 
+  position: relative;
+  transition: background 0.15s ease;
+}
+.message-row:hover { background: #f8faf9; }
+
+.row-to { 
+  width: 200px; 
+  flex: 0 0 200px; 
+  font-size: 13.5px; 
+  color: #222a24; 
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row-main { 
+  min-width: 0; 
+  flex: 1; 
+  display: flex; 
+  align-items: center; 
+  gap: 16px; 
+  overflow: hidden; 
+  font-size: 13.5px; 
+}
+
+/* Status Badges */
+.status-pill {
+  flex-shrink: 0; /* Prevents pill from squishing */
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid transparent;
 }
 
@@ -144,10 +232,31 @@ button:disabled { cursor: default; }
   100% { opacity: 1; transform: scale(1); }
 }
 
+/* Row Text Content */
+.row-copy { 
+  min-width: 0; 
+  flex: 1; 
+  display: flex; 
+  align-items: center; 
+  gap: 10px; 
+  overflow: hidden; 
+}
+.row-copy strong { 
+  flex-shrink: 0; 
+  white-space: nowrap;
+  color: #1a1d1b;
+}
+.row-preview { 
+  white-space: nowrap; 
+  color: #8b938d; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+}
+
 .star { flex: 0 0 auto; color: #b9c0bb; }
 .empty-state { min-height: 330px; display: grid; place-items: center; align-content: center; gap: 8px; color: #9aa19d; }
-.empty-state strong { color: #555d58; font-size: 14px; }
-.empty-state span { font-size: 12px; }
+.empty-state strong { color: #555d58; font-size: 15px; }
+.empty-state span { font-size: 13px; }
 
 /* Composer */
 .composer { max-width: 976px; margin: 0 auto; }
@@ -249,36 +358,7 @@ button:disabled { cursor: default; }
 .settings-alert.success { background: #effaf2; color: #258047; }
 .muted-nav.active { background: #eef8f1; color: #00a744; }
 
-/* Mailbox Search */
-.mailbox-search {
-  flex: 1;
-  max-width: 360px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 11px;
-  border: 1px solid #e2e7e4;
-  border-radius: 9px;
-  background: #fafcfb;
-  color: #8a938d;
-  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
-}
-
-.mailbox-search:focus-within {
-  background: #fff;
-  border-color: #9ed9b5;
-  box-shadow: 0 0 0 3px rgba(0, 172, 67, .08);
-}
-
-.mailbox-search svg { flex: 0 0 auto; }
-.mailbox-search input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; color: #303832; font-size: 12px; }
-.mailbox-search input::placeholder { color: #a2aaa5; }
-.search-status { min-height: 28px; display: flex; align-items: center; padding: 7px 12px; color: #8b938d; font-size: 11px; }
-.search-status.error { color: #b33b3b; }
 .search-spinner { width: 13px; height: 13px; border: 1.5px solid #dce4df; border-top-color: #00a744; border-radius: 50%; animation: spin .7s linear infinite; }
-.row-copy { min-width: 0; flex: 1; display: flex; align-items: center; gap: 8px; overflow: hidden; }
-.row-copy strong { overflow: hidden; text-overflow: ellipsis; }
 
 @media (max-width: 800px) {
   .mailbox-toolbar { flex-wrap: wrap; height: auto; gap: 8px; }
