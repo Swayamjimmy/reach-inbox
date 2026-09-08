@@ -211,3 +211,104 @@ button:disabled { cursor: default; }
 .settings-alert.error { background: #fff1f1; color: #b33b3b; }
 .settings-alert.success { background: #effaf2; color: #258047; }
 .muted-nav.active { background: #eef8f1; color: #00a744; }
+
+/* =========================================================
+   Mailbox Search
+   ========================================================= */
+
+.mailbox-toolbar {
+  gap: 16px;
+}
+
+.mailbox-search {
+  flex: 1;
+  max-width: 360px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 11px;
+  border: 1px solid #e2e7e4;
+  border-radius: 9px;
+  background: #fafcfb;
+  color: #8a938d;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.mailbox-search:focus-within {
+  background: #fff;
+  border-color: #9ed9b5;
+  box-shadow: 0 0 0 3px rgba(0, 172, 67, .08);
+}
+
+.mailbox-search svg {
+  flex: 0 0 auto;
+}
+
+.mailbox-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #303832;
+  font-size: 12px;
+}
+
+.mailbox-search input::placeholder {
+  color: #a2aaa5;
+}
+
+.search-status {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 7px 12px;
+  color: #8b938d;
+  font-size: 11px;
+}
+
+.search-status.error {
+  color: #b33b3b;
+}
+
+.search-spinner {
+  width: 13px;
+  height: 13px;
+  border: 1.5px solid #dce4df;
+  border-top-color: #00a744;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+
+.row-main {
+  min-width: 0;
+}
+
+.row-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.row-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 800px) {
+  .mailbox-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 8px;
+  }
+
+  .mailbox-search {
+    order: 3;
+    max-width: none;
+    width: 100%;
+  }
+}

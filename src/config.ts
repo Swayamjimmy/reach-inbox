@@ -19,6 +19,14 @@ export const config = {
     process.env.REDIS_URL ??
     "redis://localhost:6379",
 
+  elasticsearchUrl:
+    process.env.ELASTICSEARCH_URL ??
+    "http://localhost:9200",
+
+  elasticsearchIndex:
+    process.env.ELASTICSEARCH_INDEX ??
+    "reachinbox-emails",
+
   frontendOrigin:
     process.env.FRONTEND_ORIGIN ??
     "http://localhost:5173",
