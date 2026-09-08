@@ -1,4 +1,3 @@
-```markdown
 # ReachInbox Email Scheduler
 
 A full-stack, distributed email scheduling and automation platform. Built to handle delayed sending, rate limiting, and reliable delivery using Express.js, PostgreSQL, Redis (BullMQ), Elasticsearch, and React.
