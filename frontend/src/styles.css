@@ -1,5 +1,4 @@
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=VT323&display=swap');
 
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -50,6 +49,16 @@ button:disabled { cursor: default; }
   width: 322px; flex: 0 0 322px; padding: 40px 20px 24px 24px;
   border-right: 0 solid #eee; position: relative; background: #fff;
 }
+
+/* Pixel Font Logo */
+.sidebar-logo {
+  font-family: 'VT323', monospace;
+  font-size: 28px;
+  color: #00ab44;
+  margin-bottom: 24px;
+  letter-spacing: 1px;
+}
+
 .identity {
   height: 55px; border-radius: 14px; background: #f4f6f4; padding: 7px 12px;
   display: flex; align-items: center; gap: 10px; margin-bottom: 11px;
@@ -88,7 +97,7 @@ button:disabled { cursor: default; }
 
 /* Mailbox */
 .mailbox { max-width: 1100px; margin: 40px auto 0; }
-.mailbox-toolbar { height: 38px; display: flex; align-items: center; justify-content: space-between; }
+.mailbox-toolbar { height: 38px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .mailbox-toolbar h2 { font-size: 18px; font-weight: 600; margin: 0; }
 .icon-button { width: 34px; height: 34px; display: grid; place-items: center; color: #727b75; }
 .message-list { border-top: 1px solid #f0f2f1; margin-top: 13px; }
@@ -101,11 +110,40 @@ button:disabled { cursor: default; }
 .row-main { min-width: 0; flex: 1; display: flex; align-items: center; gap: 8px; overflow: hidden; font-size: 13px; }
 .row-main strong { white-space: nowrap; font-weight: 500; }
 .row-preview { white-space: nowrap; color: #a0a7a2; overflow: hidden; text-overflow: ellipsis; }
-.scheduled-pill, .sent-pill {
-  flex: 0 0 auto; border-radius: 14px; padding: 4px 9px; font-size: 11px; display: flex; align-items: center; gap: 4px;
+
+/* New Status Badges */
+.status-pill {
+  flex: 0 0 auto;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid transparent;
 }
-.scheduled-pill { background: #fff0df; color: #e8863a; }
-.sent-pill { background: #f0f3f2; color: #68716b; }
+
+.scheduled-pill { background: #fdfaf5; color: #b38541; border-color: #f6ecd9; }
+.rate-limited-pill { background: #fff0f0; color: #d94343; border-color: #f7dfdf; }
+.processing-pill { background: #f0f7ff; color: #3b82f6; border-color: #dbeafe; }
+.sent-pill { background: #f4fdf7; color: #15803d; border-color: #dcfce7; }
+.failed-pill { background: #fef2f2; color: #b91c1c; border-color: #fee2e2; }
+
+.pulsing-dot {
+  width: 6px;
+  height: 6px;
+  background: #3b82f6;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
 .star { flex: 0 0 auto; color: #b9c0bb; }
 .empty-state { min-height: 330px; display: grid; place-items: center; align-content: center; gap: 8px; color: #9aa19d; }
 .empty-state strong { color: #555d58; font-size: 14px; }
@@ -185,7 +223,6 @@ button:disabled { cursor: default; }
   .main { padding-left: 20px; }
 }
 
-
 /* Slack settings */
 .settings-page { max-width: 900px; margin: 55px auto; padding: 0 24px; }
 .settings-header { margin-bottom: 24px; }
@@ -212,14 +249,7 @@ button:disabled { cursor: default; }
 .settings-alert.success { background: #effaf2; color: #258047; }
 .muted-nav.active { background: #eef8f1; color: #00a744; }
 
-/* =========================================================
-   Mailbox Search
-   ========================================================= */
-
-.mailbox-toolbar {
-  gap: 16px;
-}
-
+/* Mailbox Search */
 .mailbox-search {
   flex: 1;
   max-width: 360px;
@@ -241,74 +271,16 @@ button:disabled { cursor: default; }
   box-shadow: 0 0 0 3px rgba(0, 172, 67, .08);
 }
 
-.mailbox-search svg {
-  flex: 0 0 auto;
-}
-
-.mailbox-search input {
-  width: 100%;
-  min-width: 0;
-  border: 0;
-  outline: none;
-  background: transparent;
-  color: #303832;
-  font-size: 12px;
-}
-
-.mailbox-search input::placeholder {
-  color: #a2aaa5;
-}
-
-.search-status {
-  min-height: 28px;
-  display: flex;
-  align-items: center;
-  padding: 7px 12px;
-  color: #8b938d;
-  font-size: 11px;
-}
-
-.search-status.error {
-  color: #b33b3b;
-}
-
-.search-spinner {
-  width: 13px;
-  height: 13px;
-  border: 1.5px solid #dce4df;
-  border-top-color: #00a744;
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
-}
-
-.row-main {
-  min-width: 0;
-}
-
-.row-copy {
-  min-width: 0;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  overflow: hidden;
-}
-
-.row-copy strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.mailbox-search svg { flex: 0 0 auto; }
+.mailbox-search input { width: 100%; min-width: 0; border: 0; outline: none; background: transparent; color: #303832; font-size: 12px; }
+.mailbox-search input::placeholder { color: #a2aaa5; }
+.search-status { min-height: 28px; display: flex; align-items: center; padding: 7px 12px; color: #8b938d; font-size: 11px; }
+.search-status.error { color: #b33b3b; }
+.search-spinner { width: 13px; height: 13px; border: 1.5px solid #dce4df; border-top-color: #00a744; border-radius: 50%; animation: spin .7s linear infinite; }
+.row-copy { min-width: 0; flex: 1; display: flex; align-items: center; gap: 8px; overflow: hidden; }
+.row-copy strong { overflow: hidden; text-overflow: ellipsis; }
 
 @media (max-width: 800px) {
-  .mailbox-toolbar {
-    flex-wrap: wrap;
-    height: auto;
-    gap: 8px;
-  }
-
-  .mailbox-search {
-    order: 3;
-    max-width: none;
-    width: 100%;
-  }
+  .mailbox-toolbar { flex-wrap: wrap; height: auto; gap: 8px; }
+  .mailbox-search { order: 3; max-width: none; width: 100%; }
 }
