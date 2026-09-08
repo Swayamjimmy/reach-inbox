@@ -223,15 +223,16 @@ export async function indexEmail(
 
   await ensureIndex();
 
-  await request(
+  // indexEmail(): add refresh=wait_for
+    await request(
     `/${encodeURIComponent(
-      config.elasticsearchIndex,
-    )}/_doc/${encodeURIComponent(email.id)}`,
+        config.elasticsearchIndex,
+    )}/_doc/${encodeURIComponent(email.id)}?refresh=wait_for`,
     {
-      method: "PUT",
-      body: JSON.stringify(toDocument(email)),
+        method: "PUT",
+        body: JSON.stringify(toDocument(email)),
     },
-  );
+);
 }
 
 export async function removeEmailFromIndex(
@@ -400,22 +401,38 @@ export async function searchEmails(input: {
             filter: filters,
 
             must: [
-              {
-                multi_match: {
-                  query,
-
-                  fields: [
-                    "toEmail^3",
-                    "subject^4",
-                    "textBody",
-                    "senderId",
-                  ],
-
-                  type: "best_fields",
-                  fuzziness: "AUTO",
-                },
-              },
-            ],
+  {
+    bool: {
+      should: [
+        {
+          match_phrase_prefix: {
+            toEmail: {
+              query,
+              max_expansions: 50,
+            },
+          },
+        },
+        {
+          match_phrase_prefix: {
+            subject: {
+              query,
+              max_expansions: 50,
+            },
+          },
+        },
+        {
+          match_phrase_prefix: {
+            textBody: {
+              query,
+              max_expansions: 50,
+            },
+          },
+        },
+      ],
+      minimum_should_match: 1,
+    },
+  },
+],
           },
         }
       : {
