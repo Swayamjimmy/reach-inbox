@@ -1,0 +1,3 @@
+api.reach-swayam.duckdns.org {
+    reverse_proxy api:3000
+}
